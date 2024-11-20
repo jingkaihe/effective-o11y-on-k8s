@@ -1,0 +1,56 @@
+name: Publish
+
+on:
+  # Runs on pushes targeting the default branch
+  push:
+    branches:
+      - main
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+# Default to bash
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      - name: Install project
+        run: pip install -r requirements.txt
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
+      - name: Compile slides
+        run: |
+          jupyter nbconvert effective-o11y-on-kubernetes.ipynb --to slides --output-dir ./public;
+          mv ./public/effective-o11y-on-kubernetes.slides.html ./public/index.html;
+      - name: Upload artifacts
+        uses: actions/upload-pages-artifact@v3
+        with:
+          name: github-pages
+          path: ./public
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

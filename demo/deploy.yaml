@@ -1,0 +1,103 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: o11y-demo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: o11y-demo
+  namespace: o11y-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: o11y-demo
+  template:
+    metadata:
+      labels:
+        app: o11y-demo
+      annotations:
+        k8s.grafana.com/scrape: "true"
+        k8s.grafana.com/metrics.path: "/metrics"
+        k8s.grafana.com/metrics.portName: "metrics"
+        k8s.grafana.com/metrics.scheme: "http"
+        k8s.grafana.com/job: "integrations/o11y-demo"
+    spec:
+      containers:
+        - name: o11y-demo
+          image: jingkaihe/o11y-demo:0.1.1.alpha4
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: metrics
+              containerPort: 8081
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+          env:
+            - name: OTEL_EXPORTER_OTLP_INSECURE
+              value: "true"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://grafana-k8s-monitoring-grafana-agent.observability.svc.cluster.local:4318"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "grpc"
+            - name: OTEL_SERVICE_NAME
+              value: "o11y-demo"
+            - name: NAUGHTY
+              value: "true"
+---
+# kind: PodMonitor
+# apiVersion: monitoring.coreos.com/v1
+# metadata:
+#   name: o11y-demo
+#   namespace: o11y-demo
+# spec:
+#   selector:
+#     matchLabels:
+#       app: o11y-demo
+#   podMetricsEndpoints:
+#     - port: metrics
+#       interval: 60s
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: o11y-demo
+  namespace: o11y-demo
+spec:
+  selector:
+    app: o11y-demo
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+kind: Ingress
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: o11y-demo
+  namespace: o11y-demo
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  rules:
+    - host: o11y-demo.metal.hjktech.uk
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: o11y-demo
+                port:
+                  number: 8080
+  tls:
+    - hosts:
+        - o11y-demo.metal.hjktech.uk
+      secretName: o11y-demo-tls
